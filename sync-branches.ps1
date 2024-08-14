@@ -1,6 +1,6 @@
 param(
     [string]$mainBranch = "master",
-    [string[]]$branches = @(), # Array of branches to merge
+    [string[]]$branches = @("tomasvahalik/fleet/createaction", "tomasvahalik/fleet/resource+overview", "tomasvahalik/fleet/tierCreation", "tomasvahalik/fleet/createDB"), # Array of branches to merge
     [string]$workingDirectory = ".",
     [switch]$help = $false
 )
@@ -15,10 +15,23 @@ function Show-Help {
     Write-Host "Example: sync-branches.ps1 -mainBranch main -branches feature1,feature2,feature3 -workingDirectory C:\Projects\MyProject"
 }
 
+
+# save current directory to return to it later
+$currentDirectory = Get-Location
+
+function Exit-Script {
+    param(
+        [int]$exitCode = 0
+    )
+
+    Set-Location $currentDirectory
+    exit $exitCode
+}
+
 # Check if help flag is present
 if ($args -contains "-help" -or $args -contains "-h") {
     Show-Help
-    exit 0
+    Exit-Script
 }
 
 # Change to the working directory
@@ -42,9 +55,9 @@ function Merge-Branch {
 
             # Ensure conflicts are resolved and changes committed
             git status | Select-String "Unmerged paths" -quiet
-            if ($LASTEXITCODE -eq 0) {
+            if ($LASTEXITCODE -ne 0) {
                 Write-Error -Message "Conflicts are not resolved. Exiting script."
-                exit 1
+                Exit-Script -exitCode 1
             }
 
             Write-Host "Conflicts resolved. Continuing script."
@@ -52,14 +65,14 @@ function Merge-Branch {
     }
     else {
         Write-Error -Message "Failed to switch to branch $targetBranch"
-        exit 1
+        Exit-Script -exitCode 1
     }
 }
 
 # Check if Git is installed
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Error -Message "Git is not installed. Please install Git and try again."
-    exit 1
+    Exit-Script -exitCode 1
 }
 
 # Check if current directory is a Git repository
@@ -69,19 +82,19 @@ if (-not (Test-Path .git)) {
     Write-Host ""
     # Error message
     Write-Error -Message "Current directory is not a Git repository. Please navigate to a Git repository and try again."
-    exit 1
+    Exit-Script -exitCode 1
 }
 
 # Check if branches are provided
 if ($branches.Length -eq 0) {
     Write-Error -Message "No branches specified. Please provide branches to merge."
-    exit 1
+    Exit-Script -exitCode 1
 }
 
 # Check if main branch is provided
 if (-not (git branch --list $mainBranch)) {
     Write-Error -Message "Main branch $mainBranch does not exist. Please provide a valid main branch."
-    exit 1
+    Exit-Script -exitCode 1
 }
 
 # Checkout and update the main branch
@@ -117,3 +130,5 @@ if ($push -eq "Y" -or $push -eq "y") {
 else {
     Write-Host "Changes not pushed to remote repository. Check them locally and push them manually."
 }
+
+Exit-Script
